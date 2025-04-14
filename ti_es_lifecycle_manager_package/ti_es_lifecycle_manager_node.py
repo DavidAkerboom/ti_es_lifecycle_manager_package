@@ -10,10 +10,10 @@ class LifecycleManager(Node):
     def __init__(self):
         super().__init__('lifecycle_manager')
 
-        # List of lifecycle nodes to manage (use topic names)
+        # List of lifecycle nodes to manage
         self.lifecycle_nodes = [
-            # 'temperature_humidity_topic',
-            # 'logger_topic'
+            # 'temperature_humidity_node',
+            # 'logger_node'
             'lc_talker'
         ]
 
