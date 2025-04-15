@@ -5,6 +5,15 @@ from lifecycle_msgs.srv import ChangeState
 from lifecycle_msgs.msg import Transition
 
 from std_msgs.msg import String
+from dataclasses import dataclass
+
+@dataclass
+class Node:
+    name: str
+    active_when_moving: bool
+    active_when_idle: bool
+    active_when_sleep: bool
+
 
 class LifecycleManager(Node):
     def __init__(self):
@@ -14,7 +23,7 @@ class LifecycleManager(Node):
         self.lifecycle_nodes = [
             # 'temperature_humidity_node',
             # 'logger_node'
-            'lc_talker'
+            Node(name='lc_talker', active_when_moving=1, active_when_idle=0, active_when_sleep=0)
         ]
 
         self.subscription = self.create_subscription(String, 'ti/es/change_state', self.listener_callback, 10)
@@ -23,53 +32,92 @@ class LifecycleManager(Node):
         self.get_logger().info('Waiting for lifecycle services...')
 
         for node_name in self.lifecycle_nodes:
-            self.configure_and_activate_node(node_name)
+            self.setup_state_client(node_name)
 
-#        self.timer = self.create_timer(10.0, self.deactivate_all_nodes)
 
+    def configure(self, node_name):
+        self.get_logger().info(f'Configuring {node_name}...')
+        self.change_state(self.change_state_clients[node_name], Transition.TRANSITION_CONFIGURE)
+
+    def activate(self, node_name):
+        self.get_logger().info(f'Activating {node_name}...')
+        self.change_state(self.change_state_clients[node_name], Transition.TRANSITION_ACTIVATE)
+        
+    def deactivate(self, node_name):
+        self.get_logger().info(f'Deactivating {node_name}...')
+        self.change_state(self.change_state_clients[node_name], Transition.TRANSITION_DEACTIVATE)
+    
+    def cleanup(self, node_name):
+        self.get_logger().info(f'Cleaning up {node_name}...')
+        self.change_state(self.change_state_clients[node_name], Transition.TRANSITION_CLEANUP)
+
+    def shutdown(self, node_name):
+        self.get_logger().info(f'Shutting down {node_name}...')
+        self.change_state(self.change_state_clients[node_name], Transition.TRANSITION_SHUTDOWN)
+
+
+    # listens for commands and sets lifecycle nodes accordingly 
     def listener_callback(self, msg):
         self.get_logger().info(f'Received message: {msg.data}')
-        if msg.data == "activate":
-            for node_name, client in self.change_state_clients.items():
-                self.get_logger().info(f'Configuring {node_name}...')
-                self.change_state(client, Transition.TRANSITION_CONFIGURE)
-                self.get_logger().info(f'Activating {node_name}...')
-                self.change_state(client, Transition.TRANSITION_ACTIVATE)
-        if msg.data == "deactivate":
-            for node_name, client in self.change_state_clients.items():
-                self.get_logger().info(f'Deactivating {node_name}...')
-                self.change_state(client, Transition.TRANSITION_DEACTIVATE)
-                self.get_logger().info(f'Cleaning up {node_name}...')
-                self.change_state(client, Transition.TRANSITION_CLEANUP)
+        
+        match msg.data:
+            case "set_moving":
+                self._update_nodes(condition="active_when_moving")
+            case "set_idle":
+                self._update_nodes(condition="active_when_idle")
+            case "set_sleep":
+                self._update_nodes(condition="active_when_sleep")
+            case "configure_all":
+                self._update_all_nodes(action="configure")
+            case "activate_all":
+                self._update_all_nodes(action="activate")
+            case "deactivate_all":
+                self._update_all_nodes(action="deactivate")
+            case "cleanup_all":
+                self._update_all_nodes(action="cleanup")
+            case "shutdown_all":
+                self._update_all_nodes(action="shutdown")
 
-    def configure_and_activate_node(self, node_name):
+
+    # sets node states according to the mount state received from the callback
+    def _update_nodes(self, condition: str):
+        for node in self.lifecycle_nodes:
+            if getattr(node, condition):
+                self.configure(node.name)
+                self.activate(node.name)
+            else:
+                self.deactivate(node.name)
+                self.cleanup(node.name)
+
+
+    # sets all nodes to the state received from the callback
+    def _update_all_nodes(self, action: str):
+        for node in self.lifecycle_nodes:
+            method = getattr(self, action, None)
+            if callable(method):
+                method(node.name)
+            else:
+                self.get_logger().warn(f"No method named '{action}' found on self")
+
+
+    # sets up a lifecycle service client for changing the state of another node
+    def setup_state_client(self, node_name):
         change_state_client = self.create_client(ChangeState, f'{node_name}/change_state')
         self.change_state_clients[node_name] = change_state_client
 
         while not change_state_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().warn(f'Waiting for {node_name}/change_state service...')
 
-        self.get_logger().info(f'Configuring {node_name}...')
-        self.change_state(change_state_client, Transition.TRANSITION_CONFIGURE)
 
-        self.get_logger().info(f'Activating {node_name}...')
-        self.change_state(change_state_client, Transition.TRANSITION_ACTIVATE)
-
-    def deactivate_all_nodes(self):
-            self.get_logger().info('Deactivating all lifecycle nodes...')
-            for node_name, client in self.change_state_clients.items():
-                self.get_logger().info(f'Deactivating {node_name}...')
-                self.change_state(client, Transition.TRANSITION_DEACTIVATE)
-                self.get_logger().info(f'Cleaning up {node_name}...')
-                self.change_state(client, Transition.TRANSITION_CLEANUP)
-            self.destroy_timer(self.timer)
-
+    # checks whether node state was succesful
     def _handle_transition_result(self, future, transition_id, node_name=None):
         if future.result() is not None and future.result().success:
             self.get_logger().info(f'Transition {transition_id} successful.')
         else:
             self.get_logger().error(f'Transition {transition_id} failed.')
 
+
+    # handles node state transitions
     def change_state(self, client, transition_id, node_name=None):
         req = ChangeState.Request()
         req.transition.id = transition_id
