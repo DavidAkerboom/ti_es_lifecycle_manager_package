@@ -22,12 +22,40 @@ For more information about lifecycle nodes, see the following links:
 - Subscribes to a topic (`ti/es/change_state`) to trigger transitions based on runtime events
 - Gracefully handles configuration, activation, deactivation, and cleanup transitions
 
+## Mount States (not yet implemented)
+
+The idea is to define the following states for the telescope mount:
+- moving
+  - In this state the mount is in an active state where it is orienting the telescope towards a certain coordinate.
+- idle
+  - In this state the mount is inactive and ready to receive an action.
+- sleep (maybe not necessary)
+  - This state is activated when the mount is idle for x minutes. In this state only nodes active are for waking up and going back to idle.
+
+The state can be changed by publishing a message to the topic `ti/es/change_state`. This should be done in the brain node.
+
+In the table below is shown in which state each node is active. (there may be mistakes, changes can be made)
+
+| nodes                         | moving | idle | sleep |
+| ----------------------------- | ------ | ---- | ----- |
+| brain                         | ✅      | ✅    | ✅     |
+| keypad                        | ✅      | ✅    | ✅     |
+| display                       | ✅      | ✅    | ❌     |
+| temperature & humidity sensor | ✅      | ✅    | ❌     |
+| motors                        | ✅      | ❌    | ❌     |
+| distance sensors              | ✅      | ❌    | ❌     |
+| angle sensors                 | ✅      | ❌    | ❌     |
+| camera (pid)                  | ✅      | ❌    | ❌     |
+| gps (once then deactivate?)   | ✅      | ❌    | ❌     |
+
+Nodes which are active in all mount states don't need to be a lifecycle node. 
+
 ---
 
 ## 🚀 Lifecycle Manager Usage
 
 ### 1. Add Lifecycle Nodes
-In the `LifecycleManager` Python file, update the list of managed nodes:
+In the `ti_es_lifecycle_manager_node` Python file, update the list of managed nodes:
 ```python
 self.lifecycle_nodes = [
     'temperature_humidity_node',
@@ -147,3 +175,11 @@ change state:
 ```bash
 ros2 lifecycle set /<lifecycle_node> <state>
 ```
+replace `<state` with one of the following options:
+- create
+- configure
+- cleanup
+- activate
+- deactivate
+- shutdown
+- destroy
