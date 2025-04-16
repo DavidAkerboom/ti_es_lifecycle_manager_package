@@ -34,9 +34,7 @@ class LifecycleManager(Node):
 
         # List of lifecycle nodes to manage
         self.lifecycle_nodes = [
-            # 'temperature_humidity_node',
-            # 'logger_node'
-            LifecycleNode(name='lc_talker', active_when_moving=1, active_when_idle=0, active_when_sleep=0)
+            LifecycleNode(name='temperature_humidity_node', active_when_moving=1, active_when_idle=0, active_when_sleep=0)
         ]
 
         self.subscription = self.create_subscription(String, 'ti/es/change_state', self.listener_callback, 10)
