@@ -22,19 +22,19 @@ For more information about lifecycle nodes, see the following links:
 - Subscribes to a topic (`ti/es/change_state`) to trigger transitions based on runtime events
 - Gracefully handles configuration, activation, deactivation, and cleanup transitions
 
-## Mount States (not yet implemented)
+## Mount States
 
 The idea is to define the following states for the telescope mount:
 - moving
   - In this state the mount is in an active state where it is orienting the telescope towards a certain coordinate.
 - idle
   - In this state the mount is inactive and ready to receive an action.
-- sleep (maybe not necessary)
+- sleep
   - This state is activated when the mount is idle for x minutes. In this state only nodes active are for waking up and going back to idle.
 
 The state can be changed by publishing a message to the topic `ti/es/change_state`. This should be done in the brain node.
 
-In the table below is shown in which state each node is active. (there may be mistakes, changes can be made)
+In the table below is shown in which state each node is active.
 
 | nodes                         | moving | idle | sleep |
 | ----------------------------- | ------ | ---- | ----- |
@@ -46,7 +46,7 @@ In the table below is shown in which state each node is active. (there may be mi
 | distance sensors              | ✅      | ❌    | ❌     |
 | angle sensors                 | ✅      | ❌    | ❌     |
 | camera (pid)                  | ✅      | ❌    | ❌     |
-| gps (once then deactivate?)   | ✅      | ❌    | ❌     |
+| gps                           | ✅      | ❌    | ❌     |
 
 Nodes which are active in all mount states don't need to be a lifecycle node. 
 
